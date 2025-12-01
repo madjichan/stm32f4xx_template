@@ -1,0 +1,7 @@
+.repo/
+src/CMSIS/
+src/HAL/
+include/CMSIS/
+include/HAL/
+*.elf
+*.bin
