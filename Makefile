@@ -36,10 +36,12 @@ SRCS = src/CMSIS/$(CHIPSRC_STARTUP) \
 
 all: $(TARGET).bin
 
+clone:
+	git -C .repo/ pull || git clone --recursive --depth=1 https://github.com/STMicroelectronics/STM32CubeF4.git .repo/
+
 init:
 	mkdir -p src/ src/CMSIS src/HAL
 	mkdir -p include/ include/CMSIS include/HAL
-	git -C .repo/ pull || git clone --recursive --depth=1 https://github.com/STMicroelectronics/STM32CubeF4.git .repo/
 	cp -r .repo/$(CMSIS_PREFIX)/Device/ST/STM32F4xx/Source/Templates/gcc/$(CHIPSRC_STARTUP) ./src/CMSIS/
 	cp -r .repo/$(CMSIS_PREFIX)/Device/ST/STM32F4xx/Source/Templates/$(CHIPSRC_SYSTEM) ./src/CMSIS/
 	cp -r .repo/$(CMSIS_PREFIX)/Device/ST/STM32F4xx/Include/$(CHIPSRC_INCLUDE) ./include/CMSIS/
@@ -61,4 +63,4 @@ clean:
 flash: $(TARGET).bin
 	st-flash write $^ 0x08000000
 
-.PHONY: all init clean flash
+.PHONY: all init clean flash clone
