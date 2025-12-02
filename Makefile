@@ -27,12 +27,17 @@ CFLAGS := -mcpu=cortex-m4 -mthumb -O2 -Wall \
 
 LDFLAGS := -T $(TARGET).ld -nostartfiles -lc -lgcc
 
-SRCS = src/CMSIS/$(CHIPSRC_STARTUP) \
-	    src/CMSIS/$(CHIPSRC_SYSTEM) \
+ASRCS := src/CMSIS/$(CHIPSRC_STARTUP)
+
+SRCS := src/CMSIS/$(CHIPSRC_SYSTEM) \
 	    $(wildcard src/HAL/*.c) \
 		src/init_stub.c \
 	    src/syscalls.c \
 		src/main.c
+
+AOBJS = $(addprefix .build/,$(ASRCS:.s=.o))
+OBJS = $(addprefix .build/,$(SRCS:.c=.o))
+DEPS = $(OBJS:.o=.d)
 
 all: $(TARGET).bin
 
@@ -54,13 +59,30 @@ init:
 $(TARGET).bin: $(TARGET).elf
 	$(OBJCOPY) -O binary $^ $@
 
-$(TARGET).elf: $(SRCS)
-	$(CC) $(CFLAGS) $(SRCS) $(LDFLAGS) -o $@
+$(TARGET).elf: $(OBJS) $(AOBJS)
+	$(CC) $^ -o $@ $(LDFLAGS) $(CFLAGS)
+
+$(AOBJS): .build/%.o: %.s
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJS): .build/%.o: %.c
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(DEPS): .build/%.d: %.c
+	@mkdir -p $(@D)
+	$(CC) -E $(CFLAGS) $< -MM -MT $(@:.d=.o) > $@
 
 clean:
-	rm -f *.elf *.bin
+	rm -rf *.elf *.bin .build/
 
 flash: $(TARGET).bin
 	st-flash write $^ 0x08000000
 
-.PHONY: all init clean flash clone
+NODEPS = clone init clean
+.PHONY: all clone init clean flash
+
+ifeq (0, $(words $(findstring $(MAKECMDGOALS), $(NODEPS))))
+include $(DEPS)
+endif
