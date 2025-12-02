@@ -1,3 +1,4 @@
+.build/
 .repo/
 src/CMSIS/
 src/HAL/
