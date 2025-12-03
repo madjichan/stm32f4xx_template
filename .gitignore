@@ -1,4 +1,5 @@
 .repo/
+.build/
 src/CMSIS/
 src/HAL/
 include/CMSIS/
