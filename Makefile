@@ -9,6 +9,7 @@ CHIP_LOWER := $(shell echo $(CHIP_NAME) | tr A-Z a-z)
 CHIP_PREFIX := $(shell echo $(CHIP_NAME) | sed -E 's/$(CHIP_REGEX)/STM32\1\2\3x\5/')
 STARTUP_FILENAME := $(shell echo $(CHIP_NAME) | sed -E 's/$(CHIP_REGEX)/stm32\1\2\3x\5/' | tr A-Z a-z)
 CHIP_SERIES := $(shell echo $(CHIP_NAME) | sed -E 's/$(CHIP_REGEX)/stm32\1\2xx/' | tr A-Z a-z)
+CHIP_SERIES_UC := $(shell echo $(CHIP_NAME) | sed -E 's/$(CHIP_REGEX)/STM32\1\2xx/')
 
 REPO_NAME := $(shell echo $(CHIP_NAME) | sed -E 's/$(CHIP_REGEX)/STM32Cube\1\2/')
 REPO_PATH := .repo/$(REPO_NAME)
@@ -18,9 +19,14 @@ CHIPSRC_SYSTEM := system_$(CHIP_SERIES).c
 CHIPSRC_STARTUP := startup_$(STARTUP_FILENAME).s
 
 CMSIS_PREFIX := Drivers/CMSIS
-HAL_PREFIX := Drivers/STM32F4xx_HAL_Driver
+HAL_PREFIX := Drivers/$(CHIP_SERIES_UC)_HAL_Driver
 HAL_SRC_DIR := $(realpath $(REPO_PATH)/$(HAL_PREFIX)/Src)
 HAL_INC_DIR := $(realpath $(REPO_PATH)/$(HAL_PREFIX)/Inc)
+
+CMSIS_CORE_INC = $(wildcard $(REPO_PATH)/$(CMSIS_PREFIX)/Core/Include/*)
+CMSIS_DEVICE_INC = $(wildcard $(REPO_PATH)/$(CMSIS_PREFIX)/Device/ST/$(CHIP_SERIES_UC)/Include/*)
+HAL_SRC_FILES = $(filter-out %_template.c,$(patsubst $(HAL_SRC_DIR)/%,%,$(wildcard $(HAL_SRC_DIR)/*.c $(HAL_SRC_DIR)/**/*.c)))
+HAL_INC_FILES = $(filter-out %_template.h,$(patsubst $(HAL_INC_DIR)/%,%,$(wildcard $(HAL_INC_DIR)/*.h $(HAL_INC_DIR)/**/*.h)))
 
 CC := arm-none-eabi-gcc
 OBJCOPY := arm-none-eabi-objcopy
@@ -48,20 +54,21 @@ DEPS = $(OBJS:.o=.d)
 
 all: $(TARGET).bin
 
-clone:
-	git -C .repo/ pull 2> /dev/null || git clone --recursive --depth=1 https://github.com/STMicroelectronics/$(REPO_NAME).git $(REPO_PATH)
-
 init:
+	git -C $(REPO_PATH) pull 2> /dev/null || git clone --recursive --depth=1 https://github.com/STMicroelectronics/$(REPO_NAME).git $(REPO_PATH)
+	$(MAKE) init-rec
+
+init-rec:
 	mkdir -p src/ src/CMSIS/$(CHIP_NAME)/ src/HAL/$(CHIP_NAME)/
 	mkdir -p include/ include/CMSIS/$(CHIP_NAME)/ include/HAL/$(CHIP_NAME)/
-	cp -r $(REPO_PATH)/$(CMSIS_PREFIX)/Device/ST/STM32F4xx/Source/Templates/gcc/$(CHIPSRC_STARTUP) ./src/CMSIS/$(CHIP_NAME)/
-	cp -r $(REPO_PATH)/$(CMSIS_PREFIX)/Device/ST/STM32F4xx/Source/Templates/$(CHIPSRC_SYSTEM) ./src/CMSIS/$(CHIP_NAME)/
-	cp -r $(REPO_PATH)/$(CMSIS_PREFIX)/Device/ST/STM32F4xx/Include/$(CHIPSRC_INCLUDE) ./include/CMSIS/$(CHIP_NAME)/
-	cp -r $(wildcard $(REPO_PATH)/$(CMSIS_PREFIX)/Core/Include/*) ./include/CMSIS/$(CHIP_NAME)/
-	cp -r $(wildcard $(REPO_PATH)/$(CMSIS_PREFIX)/Device/ST/STM32F4xx/Include/*) ./include/CMSIS/$(CHIP_NAME)/
-	cp -r $(REPO_PATH)/$(HAL_PREFIX)/Inc/stm32f4xx_hal_conf_template.h ./include/HAL/$(CHIP_NAME)/stm32f4xx_hal_conf.h
-	cd $(HAL_SRC_DIR); cp -r --parents $(filter-out %_template.c,$(patsubst $(HAL_SRC_DIR)/%,%,$(wildcard $(HAL_SRC_DIR)/*.c $(HAL_SRC_DIR)/**/*.c))) $(PROJ_DIR)/src/HAL/$(CHIP_NAME)/
-	cd $(HAL_INC_DIR); cp -r --parents $(filter-out %_template.h,$(patsubst $(HAL_INC_DIR)/%,%,$(wildcard $(HAL_INC_DIR)/*.h $(HAL_INC_DIR)/**/*.h))) $(PROJ_DIR)/include/HAL/$(CHIP_NAME)/
+	cp -r $(REPO_PATH)/$(CMSIS_PREFIX)/Device/ST/$(CHIP_SERIES_UC)/Source/Templates/gcc/$(CHIPSRC_STARTUP) ./src/CMSIS/$(CHIP_NAME)/
+	cp -r $(REPO_PATH)/$(CMSIS_PREFIX)/Device/ST/$(CHIP_SERIES_UC)/Source/Templates/$(CHIPSRC_SYSTEM) ./src/CMSIS/$(CHIP_NAME)/
+	cp -r $(REPO_PATH)/$(CMSIS_PREFIX)/Device/ST/$(CHIP_SERIES_UC)/Include/$(CHIPSRC_INCLUDE) ./include/CMSIS/$(CHIP_NAME)/
+	cp -r $(CMSIS_CORE_INC) ./include/CMSIS/$(CHIP_NAME)/
+	cp -r $(CMSIS_DEVICE_INC) ./include/CMSIS/$(CHIP_NAME)/
+	cp -r $(REPO_PATH)/$(HAL_PREFIX)/Inc/$(CHIP_SERIES)_hal_conf_template.h ./include/HAL/$(CHIP_NAME)/$(CHIP_SERIES)_hal_conf.h
+	cd $(HAL_SRC_DIR); cp -r --parents $(HAL_SRC_FILES) $(PROJ_DIR)/src/HAL/$(CHIP_NAME)/
+	cd $(HAL_INC_DIR); cp -r --parents $(HAL_INC_FILES) $(PROJ_DIR)/include/HAL/$(CHIP_NAME)/
 
 $(TARGET).bin: $(TARGET).elf
 	$(OBJCOPY) -O binary $^ $@
@@ -85,13 +92,13 @@ clean:
 	rm -rf *.elf *.bin .build/
 
 clean-repo:
-	rm -rf .repo/
+	rm -rf $(REPO_PATH)
 
 flash: $(TARGET).bin
 	st-flash write $^ 0x08000000
 
-NODEPS = clone init clean clean-repo
-.PHONY: all clone init clean clean-repo flash
+NODEPS = clone init init-rec clean clean-repo
+.PHONY: all clone init init-rec clean clean-repo flash
 
 ifeq (0, $(words $(findstring $(MAKECMDGOALS), $(NODEPS))))
 include $(DEPS)

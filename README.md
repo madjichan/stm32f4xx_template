@@ -16,11 +16,6 @@ git clone https://github.com/madjichan/stm32f4xx_template.git
 cd stm32f4xx_template
 ```
 
-Download STM32CubeF4 firmware package:
-```bash
-make clone
-```
-
 Initialize project structure:
 ```bash
 make init
