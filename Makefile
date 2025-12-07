@@ -5,6 +5,13 @@ W := $(ESC)[33m
 E := $(ESC)[31m
 endif
 
+# $(call rwildcard,dir,pattern)
+rwildcard = \
+  $(foreach d,$(wildcard $1*),\
+    $(call rwildcard,$(d)/,$2) \
+  ) \
+  $(wildcard $1$2)
+
 wng = $(warning $W$1$Z)
 err = $(error $E$1$Z)
 
@@ -69,10 +76,10 @@ HAL_PREFIX := Drivers/$(CHIP_SERIES_UC)_HAL_Driver
 HAL_SRC_DIR := $(realpath $(REPO_PATH)/$(HAL_PREFIX)/Src)
 HAL_INC_DIR := $(realpath $(REPO_PATH)/$(HAL_PREFIX)/Inc)
 
-CMSIS_CORE_INC := $(wildcard $(REPO_PATH)/$(CMSIS_PREFIX)/Core/Include/*)
-CMSIS_DEVICE_INC := $(wildcard $(REPO_PATH)/$(CMSIS_PREFIX)/Device/ST/$(CHIP_SERIES_UC)/Include/*)
-HAL_SRC_FILES := $(filter-out %_template.c,$(patsubst $(HAL_SRC_DIR)/%,%,$(wildcard $(HAL_SRC_DIR)/*.c $(HAL_SRC_DIR)/**/*.c)))
-HAL_INC_FILES := $(filter-out %_template.h,$(patsubst $(HAL_INC_DIR)/%,%,$(wildcard $(HAL_INC_DIR)/*.h $(HAL_INC_DIR)/**/*.h)))
+CMSIS_CORE_INC := $(call rwildcard,$(REPO_PATH)/$(CMSIS_PREFIX)/Core/Include,*)
+CMSIS_DEVICE_INC := $(call rwildcard,$(REPO_PATH)/$(CMSIS_PREFIX)/Device/ST/$(CHIP_SERIES_UC)/Include,*)
+HAL_SRC_FILES := $(filter-out %_template.c,$(patsubst $(HAL_SRC_DIR)/%,%,$(call rwildcard,$(HAL_SRC_DIR),*.c)))
+HAL_INC_FILES := $(filter-out %_template.h,$(patsubst $(HAL_INC_DIR)/%,%,$(call rwildcard,$(HAL_INC_DIR),*.h)))
 
 CC := arm-none-eabi-gcc
 OBJCOPY := arm-none-eabi-objcopy
@@ -92,7 +99,7 @@ ASRCS := src/CMSIS/$(CHIP_NAME)/$(CHIPSRC_STARTUP)
 
 SRCS := $(TARGET_SRCS) \
 		src/CMSIS/$(CHIP_NAME)/$(CHIPSRC_SYSTEM) \
-	    $(wildcard src/HAL/$(CHIP_NAME)/*.c)
+	    $(call rwildcard,src/HAL/$(CHIP_NAME),*.c)
 
 AOBJS := $(addprefix .build/,$(ASRCS:.s=.o))
 OBJS := $(addprefix .build/,$(SRCS:.c=.o))
