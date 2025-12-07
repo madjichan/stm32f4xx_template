@@ -18,17 +18,29 @@ cd stm32f4xx_template
 
 Initialize project structure:
 ```bash
-make init
+make init CHIP_NAME=<your chip name>
+```
+
+Create target:
+```bash
+nano .targets/<your target name>.mk
+```
+
+and add needed arguments in target file. For example:
+```make
+CHIP_NAME := STM32F401CCU6
+LD_SCRIPT_PATH := stm32f401ccu6.ld
+TARGET_SRCS := src/main.c src/init_stub.c src/syscalls.c
 ```
 
 Compile:
 ```bash
-make
+make TARGET=<target name>
 ```
 
 Flash to STM32F4 (using ST-Link):
 ```bash
-make flash
+make flash TARGET=<target name>
 ```
 
 Clean build artifacts:
